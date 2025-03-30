@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Healthcare Translator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+    <div class="container mx-auto my-10 p-8 bg-white rounded-xl shadow-lg max-w-4xl">
+        <h1 class="text-3xl font-bold text-center text-blue-600 mb-6">Healthcare Translator</h1>
+        
+        <!-- Language Selection -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+                <label for="input_language" class="block text-gray-700 font-semibold mb-2">Input Language:</label>
+                <select id="input_language" class="dropdown w-full p-3 rounded border border-gray-300">
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="zh">Chinese</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="output_language" class="block text-gray-700 font-semibold mb-2">Output Language:</label>
+                <select id="output_language" class="dropdown w-full p-3 rounded border border-gray-300">
+                    <option value="es">Spanish</option>
+                    <option value="en">English</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="zh">Chinese</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Voice to Text Button -->
+        <div class="mb-4">
+            <button class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-all mb-4" onclick="startDictation()">🎙️ Start Voice-to-Text</button>
+            <textarea id="input_text" class="w-full p-3 rounded border border-gray-300 mb-4" placeholder="Speak or type here..." rows="5"></textarea>
+            <button class="translate-btn w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-all" onclick="translateText()">🌐 Translate</button>
+            <!-- Speak Button -->
+            <button id="speak_btn" class="w-full bg-yellow-600 text-white py-3 rounded-lg hover:bg-yellow-700 transition-all mt-4" onclick="speakTranslatedText()">🔊 Speak Translated Text</button>
+        </div>
+
+        <!-- Translated Text Display -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <div class="bg-gray-100 p-4 rounded shadow">
+                <h3 class="text-lg font-bold text-blue-600 mb-2">Original Text</h3>
+                <p id="original_transcript" class="text-gray-800">Your input will appear here...</p>
+            </div>
+            <div class="bg-gray-100 p-4 rounded shadow">
+                <h3 class="text-lg font-bold text-green-600 mb-2">Translated Text</h3>
+                <p id="translated_transcript" class="text-gray-800">Translation will appear here...</p>
+            </div>
+        </div>
+
+        <!-- Audio Player -->
+        <audio id="audio_player" class="w-full mt-4 rounded" controls></audio>
+    </div>
+
+    <script>
+        // Voice-to-Text with Web Speech API
+        function startDictation() {
+            const inputText = document.getElementById('input_text');
+            const recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = document.getElementById('input_language').value;
+            
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                inputText.value = event.results[0][0].transcript;
+            };
+
+            recognition.onerror = function(event) {
+                console.log("Speech recognition error: ", event.error);
+            };
+        }
+
+        // Translate text and get audio response
+        function translateText() {
+            const inputText = document.getElementById('input_text').value.trim();
+            const inputLanguage = document.getElementById('input_language').value;
+            const outputLanguage = document.getElementById('output_language').value;
+
+            if (!inputText) {
+                alert("Please enter text to translate.");
+                return;
+            }
+
+            // Disable the button while the translation is in progress
+            const translateBtn = document.querySelector('.translate-btn');
+            translateBtn.disabled = true;
+            translateBtn.textContent = "Translating...";
+
+            // First, translate to the output language (the language selected by the user)
+            fetch('/api/translate/', {
+                method: 'POST',
+                body: new URLSearchParams({
+                    'input_text': inputText,
+                    'input_language': inputLanguage,
+                    'output_language': outputLanguage
+                }),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Display original text in the input language
+                document.getElementById('original_transcript').innerText = inputText;
+
+                // Display translated text in the output language
+                document.getElementById('translated_transcript').innerText = data.translated_text;
+
+                // Now, store the audio file URL for later use
+                if (data.audio_file_url) {
+                    window.audioFileUrl = data.audio_file_url;
+                } else {
+                    alert("Audio file for translation is not available.");
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("There was an error with the translation process.");
+            })
+            .finally(() => {
+                // Re-enable the button after the translation
+                translateBtn.disabled = false;
+                translateBtn.textContent = "🌐 Translate";
+            });
+        }
+
+        // Speak Translated Text
+        function speakTranslatedText() {
+            const audioPlayer = document.getElementById('audio_player');
+            
+            // Check if the audio file URL is available
+            if (window.audioFileUrl) {
+                audioPlayer.src = window.audioFileUrl;  
+                audioPlayer.play().catch(error => {
+                    console.error("Error playing the audio:", error);
+                    alert("There was an issue playing the audio.");
+                });
+            } else {
+                alert("Please translate the text first.");
+            }
+        }
+    </script>
+</body>
+</html>
+
+
